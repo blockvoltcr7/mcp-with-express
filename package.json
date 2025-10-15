@@ -12,8 +12,14 @@
     "prepare": "pnpm run build",
     "dev": "concurrently \"npm run watch\" \"nodemon --watch build build/index.js\"",
     "agent": "node scripts/agent.mjs",
+    "agent:local": "MCP_URL=http://localhost:3000/mcp node scripts/agent.mjs",
+    "agent:prod": "MCP_URL=https://mcp-with-express-jet.vercel.app/mcp node scripts/agent.mjs",
     "agents:multi": "node scripts/multi-agent.mjs",
-    "vercel:agent": "node scripts/vercel-ai-agent.mjs"
+    "agents:multi:local": "MCP_URL=http://localhost:3000/mcp node scripts/multi-agent.mjs",
+    "agents:multi:prod": "MCP_URL=https://mcp-with-express-jet.vercel.app/mcp node scripts/multi-agent.mjs",
+    "vercel:agent": "node scripts/vercel-ai-agent.mjs",
+    "vercel:agent:local": "MCP_URL=http://localhost:3000/mcp node scripts/vercel-ai-agent.mjs",
+    "vercel:agent:prod": "MCP_URL=https://mcp-with-express-jet.vercel.app/mcp node scripts/vercel-ai-agent.mjs"
   },
   "files": [
     "build"

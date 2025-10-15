@@ -18,14 +18,15 @@ Model Context Protocol (MCP) server built with Express that exposes weather tool
 
 ## Architecture overview
 
-- **`src/index.ts`**: Express bootstrap, CORS, static files, MCP route (`POST /mcp`). Wires `StreamableHTTPServerTransport` and awaits server initialization before handling requests.
+- **`src/index.ts`**: Express bootstrap, CORS, static files, MCP routes (`POST /mcp`, `GET /mcp`, `DELETE /mcp`). Implements per-session Streamable HTTP transports: new sessions are created and stored on `initialize`; subsequent requests reuse the stored transport by `mcp-session-id`.
 - **`src/create-server.ts`**: Creates `McpServer`, registers `get-alerts` and `get-forecast`, validates inputs with Zod, calls NWS, and formats results.
 - **`public/`**: Static assets.
 - **`build/`**: Compiled JS output (never edit directly).
-- **`scripts/agent.mjs`**: Minimal agent that connects to `/mcp` and runs a prompt.
-- **`scripts/multi-agent.mjs`**: Runs two agents concurrently using separate MCP HTTP sessions.
+- **`scripts/agent.mjs`**: Minimal agent that connects to `/mcp` and runs a prompt (server assigns the session ID).
+- **`scripts/multi-agent.mjs`**: Runs two agents concurrently; each gets its own MCP HTTP session (assigned by server).
+- **`scripts/vercel-ai-agent.mjs`**: Uses the Vercel AI SDK’s MCP client to discover tools from this server.
 
-Transport: **Streamable HTTP** from `@modelcontextprotocol/sdk`, which requires clients to advertise `Accept: application/json, text/event-stream` and perform an MCP `initialize` handshake before calling tools.
+Transport: **Streamable HTTP** from `@modelcontextprotocol/sdk`, which requires an MCP `initialize` handshake before calling tools. The server assigns session IDs; clients must not hardcode or pre-generate them.
 
 ---
 
@@ -77,23 +78,17 @@ MCP_URL=http://localhost:3000/mcp
 
 ## Testing with the provided agent scripts
 
-These scripts use the OpenAI Agents SDK to connect to the MCP server and run prompts.
+These scripts use the OpenAI Agents SDK and the Vercel AI SDK to connect to the MCP server and run prompts. The server assigns session IDs during the MCP handshake.
 
-1) Install the SDK:
-```bash
-pnpm add @openai/agents
-```
-
-2) Single agent (default prompt asks for CA alerts):
+1) Single agent (default prompt asks for CA alerts):
 ```bash
 pnpm agent
 # or override the prompt
 AGENT_PROMPT="Forecast for 37.7749,-122.4194" pnpm agent
 ```
 - Script: `scripts/agent.mjs`
-- Uses a unique MCP HTTP `sessionId` per run to avoid re-initialization conflicts.
 
-3) Multi-agent (two agents, separate sessions, concurrent):
+2) Multi-agent (two agents, separate sessions, concurrent):
 ```bash
 pnpm agents:multi
 # with prompt overrides
@@ -102,6 +97,12 @@ AGENT_B_PROMPT="Forecast for 40.7128,-74.0060" \
 pnpm agents:multi
 ```
 - Script: `scripts/multi-agent.mjs`
+
+3) Vercel AI SDK MCP client (tool discovery):
+```bash
+pnpm vercel:agent
+```
+- Script: `scripts/vercel-ai-agent.mjs`
 
 ---
 
@@ -143,10 +144,13 @@ NWS notes:
   - Add header: `-H 'Accept: application/json, text/event-stream'`
 
 - **Bad Request: Server not initialized**
-  - Your client must perform the MCP `initialize` handshake first. MCP Inspector and the provided scripts do this automatically.
+  - Your client must perform the MCP `initialize` handshake first. The server will assign a session ID; clients should reuse it for subsequent requests. Inspector and the provided scripts handle this automatically.
 
 - **Invalid Request: Server already initialized**
-  - You attempted to re‑initialize an existing Streamable HTTP session. Use a unique `sessionId` per run or close/reconnect. The provided `scripts/agent.mjs` generates a unique session by default.
+  - You attempted to re‑initialize an existing Streamable HTTP session. Do not send a second `initialize` for the same session; instead, reuse the session ID returned by the server.
+
+- **Client-provided session ID fails**
+  - Do not pre-generate `sessionId` client-side. Let the server assign it during `initialize`, then include it in subsequent requests via the `mcp-session-id` header (the SDKs handle this for you).
 
 - **Port 3000 in use**
   - Kill the process using it, or set `PORT` in `.env` and restart.
@@ -163,15 +167,20 @@ NWS notes:
 - `pnpm start` – Run compiled server.
 - `pnpm agent` – Single agent example using MCP over HTTP.
 - `pnpm agents:multi` – Two agents concurrently with separate sessions.
+- `pnpm vercel:agent` – Vercel AI SDK client that connects to the MCP server and discovers tools.
 
 ---
 
 ## API endpoints
 
-- `POST /mcp` – Streamable HTTP MCP endpoint. Expects proper Accept headers and MCP handshake.
+- `POST /mcp` – Streamable HTTP MCP endpoint. Used for initialize and JSON-RPC method calls.
+- `GET /mcp` – Stream responses for the active session.
+- `DELETE /mcp` – Close the active session.
 
 ---
 
 ## Repo guidelines
 
 TypeScript sources under `src/`. Don’t edit `build/`. Use pnpm for installs. Environment via `dotenv`. See `AGENTS.md` for repository conventions and notes.
+
+For a deep dive into the session-management changes and how to avoid common pitfalls, see `docs/session-management-fix.md`.
