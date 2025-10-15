@@ -5,13 +5,10 @@ async function main() {
   const url = process.env.MCP_URL || 'http://localhost:3000/mcp';
   const prompt = process.env.AGENT_PROMPT || 'What are the current weather alerts in CA?';
 
-  // Generate a unique session for each run unless explicitly provided via env
-  const makeSessionId = () => process.env.MCP_SESSION_ID || `agent-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
+  // Don't provide sessionId - let the server assign one during initialization
   let mcpServer = new MCPServerStreamableHttp({
     url,
     name: 'Weather MCP Server',
-    sessionId: makeSessionId(),
     // cacheToolsList: true, // Optional: reduce tool discovery latency when tool list is stable
   });
 
@@ -29,7 +26,7 @@ async function main() {
       if (msg.includes('Server already initialized')) {
         // Create a fresh session and reconnect
         await mcpServer.close().catch(() => {});
-        mcpServer = new MCPServerStreamableHttp({ url, name: 'Weather MCP Server', sessionId: makeSessionId() });
+        mcpServer = new MCPServerStreamableHttp({ url, name: 'Weather MCP Server' });
         // Rebind server to agent
         agent.mcpServers = [mcpServer];
         await mcpServer.connect();

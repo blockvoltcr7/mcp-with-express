@@ -8,16 +8,14 @@ async function main() {
   const promptA = process.env.AGENT_A_PROMPT || 'List the available MCP tools and their input parameters.';
   const promptB = process.env.AGENT_B_PROMPT || 'What is the forecast for 37.7749, -122.4194?';
 
-  // Create two independent MCP HTTP sessions (unique sessionIds are helpful for logs)
+  // Create two independent MCP HTTP sessions (server will assign session IDs)
   const mcpA = new MCPServerStreamableHttp({
     url,
     name: 'Weather MCP Server (A)',
-    sessionId: `agentA-${Date.now()}`,
   });
   const mcpB = new MCPServerStreamableHttp({
     url,
     name: 'Weather MCP Server (B)',
-    sessionId: `agentB-${Date.now()}`,
   });
 
   const agentA = new Agent({

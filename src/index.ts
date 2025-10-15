@@ -2,7 +2,9 @@ import dotenv from "dotenv";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import path from "path";
+import { randomUUID } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createServer } from "./create-server.js";
 
 // Environment setup
@@ -24,17 +26,59 @@ app.use(
 );
 app.options("*", cors());
 
-// Initialize transport
-const transport = new StreamableHTTPServerTransport({
-  sessionIdGenerator: undefined, // set to undefined for stateless servers
-});
+// Store active transports by session ID
+const transports: Record<string, StreamableHTTPServerTransport> = {};
 
-// MCP endpoint
+// MCP endpoint - POST for requests
 app.post("/mcp", async (req: Request, res: Response) => {
-  console.log("Received MCP request:", req.body);
+  console.log("Received MCP POST request:", req.body);
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+  let transport: StreamableHTTPServerTransport;
+
   try {
-    // Ensure server is fully initialized before handling any MCP traffic
-    await setupPromise;
+    if (sessionId && transports[sessionId]) {
+      // Reuse existing session
+      console.log(`Reusing session: ${sessionId}`);
+      transport = transports[sessionId];
+    } else if (!sessionId && isInitializeRequest(req.body)) {
+      // New session initialization
+      console.log("Initializing new session");
+      const newSessionId = randomUUID();
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => newSessionId,
+      });
+
+      // Store transport immediately with the session ID
+      transports[newSessionId] = transport;
+      console.log(`Session pre-stored: ${newSessionId}`);
+
+      // Set up session lifecycle handlers
+      const originalOnClose = transport.onclose;
+      transport.onclose = async () => {
+        if (transport.sessionId) {
+          delete transports[transport.sessionId];
+          console.log(`Session closed: ${transport.sessionId}`);
+        }
+        if (originalOnClose) {
+          await originalOnClose.call(transport);
+        }
+      };
+
+      const { server } = createServer();
+      await server.connect(transport);
+    } else {
+      console.error("Invalid session or request");
+      res.status(400).json({
+        jsonrpc: "2.0",
+        error: {
+          code: -32000,
+          message: "Bad Request: Server not initialized",
+        },
+        id: null,
+      });
+      return;
+    }
+
     await transport.handleRequest(req, res, req.body);
   } catch (error) {
     console.error("Error handling MCP request:", error);
@@ -51,65 +95,65 @@ app.post("/mcp", async (req: Request, res: Response) => {
   }
 });
 
-// Method not allowed handlers
-const methodNotAllowed = (req: Request, res: Response) => {
-  console.log(`Received ${req.method} MCP request`);
-  res.status(405).json({
-    jsonrpc: "2.0",
-    error: {
-      code: -32000,
-      message: "Method not allowed.",
-    },
-    id: null,
-  });
-};
+// MCP endpoint - GET for streaming responses
+app.get("/mcp", async (req: Request, res: Response) => {
+  console.log("Received MCP GET request");
+  const sessionId = req.headers["mcp-session-id"] as string;
+  const transport = transports[sessionId];
 
-app.get("/mcp", methodNotAllowed);
-app.delete("/mcp", methodNotAllowed);
-
-const { server } = createServer();
-
-// Server setup
-const setupServer = async () => {
-  try {
-    await server.connect(transport);
-    console.log("Server connected successfully");
-  } catch (error) {
-    console.error("Failed to set up the server:", error);
-    throw error;
+  if (transport) {
+    try {
+      await transport.handleRequest(req, res);
+    } catch (error) {
+      console.error("Error handling MCP GET request:", error);
+      if (!res.headersSent) {
+        res.status(500).send("Internal server error");
+      }
+    }
+  } else {
+    res.status(400).send("Invalid session");
   }
-};
+});
 
-// Kick off server setup immediately and reuse this promise across handlers/startup
-const setupPromise = setupServer();
+// MCP endpoint - DELETE for session cleanup
+app.delete("/mcp", async (req: Request, res: Response) => {
+  console.log("Received MCP DELETE request");
+  const sessionId = req.headers["mcp-session-id"] as string;
+  const transport = transports[sessionId];
+
+  if (transport) {
+    try {
+      await transport.handleRequest(req, res);
+    } catch (error) {
+      console.error("Error handling MCP DELETE request:", error);
+      if (!res.headersSent) {
+        res.status(500).send("Internal server error");
+      }
+    }
+  } else {
+    res.status(400).send("Invalid session");
+  }
+});
 
 // Start server
-setupPromise
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`MCP Streamable HTTP Server listening on port ${PORT}`);
-    });
-  })
-  .catch((error) => {
-    console.error("Failed to start server:", error);
-    process.exit(1);
-  });
+app.listen(PORT, () => {
+  console.log(`MCP Streamable HTTP Server listening on port ${PORT}`);
+});
 
 // Handle server shutdown
 process.on("SIGINT", async () => {
   console.log("Shutting down server...");
-  try {
-    console.log(`Closing transport`);
-    await transport.close();
-  } catch (error) {
-    console.error(`Error closing transport:`, error);
+  
+  // Close all active transports
+  for (const [sessionId, transport] of Object.entries(transports)) {
+    try {
+      console.log(`Closing transport for session: ${sessionId}`);
+      await transport.close();
+    } catch (error) {
+      console.error(`Error closing transport ${sessionId}:`, error);
+    }
   }
 
-  try {
-    await server.close();
-    console.log("Server shutdown complete");
-  } catch (error) {
-    console.error("Error closing server:", error);
-  }
+  console.log("Server shutdown complete");
   process.exit(0);
 });

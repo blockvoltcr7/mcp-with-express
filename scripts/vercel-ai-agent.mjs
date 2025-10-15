@@ -4,12 +4,12 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 
 async function main() {
   const url = process.env.MCP_URL || 'http://localhost:3000/mcp';
-  const sessionId = process.env.MCP_SESSION_ID || `vercel-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   console.log(`[Vercel AI SDK] Connecting to MCP server: ${url}`);
 
+  // Don't provide sessionId - let the server assign one during initialization
   const mcpClient = await createMCPClient({
-    transport: new StreamableHTTPClientTransport(new URL(url), { sessionId }),
+    transport: new StreamableHTTPClientTransport(new URL(url)),
   });
 
   try {
