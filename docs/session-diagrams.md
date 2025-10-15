@@ -106,11 +106,13 @@ sequenceDiagram
     S2-->>C: 200 OK
 
     C->>S2: POST /mcp { tools/list } (with sessionId)
-    S2->>ES: append events; process request
+    S2->>ES: append request event
+    S2->>S2: process request using session state
     S2-->>C: list of tools
 
     C->>S1: DELETE /mcp (with sessionId)
-    S1->>ES: mark session closed; cleanup
+    S1->>ES: mark session closed
+    S1->>ES: cleanup session resources
     S1-->>C: 200 OK
 ```
 
@@ -137,12 +139,16 @@ stateDiagram-v2
 
 ```mermaid
 flowchart TD
-    A[Choose Storage: Vercel KV or Redis] --> B[Add dependency & env (e.g., @vercel/kv or ioredis REDIS_URL)]
-    B --> C[Implement eventStore adapter in src/session-store.ts]
-    C --> D[Wire sessionIdGenerator + eventStore in src/index.ts]
-    D --> E[Remove reliance on in-memory map for prod]
-    E --> F[Deploy to Vercel]
-    F --> G[Verify scripts: vercel:agent:prod, agent:prod, agents:multi:prod]
+    A[Choose Storage\nVercel KV or Redis] --> B[Add Dependency & Env\n@vercel/kv or ioredis + REDIS_URL]
+    B --> C[Implement eventStore Adapter\ncreate src/session-store.ts]
+    C --> D[Wire Transport\nuse sessionIdGenerator + eventStore in src/index.ts]
+    D --> E[Local Validation\npnpm build/start · run agent/multi/vercel]
+    E --> F[Deploy to Vercel\nset env vars · redeploy]
+    F --> G[Prod Verification\npnpm vercel:agent:prod · agent:prod · agents:multi:prod]
+    G --> H[Observe & Monitor\nlogs for initialize/notifications/tools · handle errors]
+    H --> I{OK?}
+    I -- yes --> J[Rollout Complete]
+    I -- no --> K[Rollback/Hotfix\nrevert or patch · re-run validation]
 ```
 
 ---
