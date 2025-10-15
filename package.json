@@ -10,7 +10,10 @@
     "watch": "tsc --watch",
     "start": "node build/index.js",
     "prepare": "pnpm run build",
-    "dev": "concurrently \"npm run watch\" \"nodemon --watch build build/index.js\""
+    "dev": "concurrently \"npm run watch\" \"nodemon --watch build build/index.js\"",
+    "agent": "node scripts/agent.mjs",
+    "agents:multi": "node scripts/multi-agent.mjs",
+    "vercel:agent": "node scripts/vercel-ai-agent.mjs"
   },
   "files": [
     "build"
@@ -20,14 +23,17 @@
   "license": "ISC",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.0",
+    "@openai/agents": "^0.1.9",
+    "add": "^2.0.6",
+    "ai": "^5.0.68",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "node-fetch": "^3.3.2",
-    "zod": "^3.24.2"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.1",
     "@types/node": "^22.10.10",
     "concurrently": "^8.2.2",

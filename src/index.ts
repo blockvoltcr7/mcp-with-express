@@ -33,6 +33,8 @@ const transport = new StreamableHTTPServerTransport({
 app.post("/mcp", async (req: Request, res: Response) => {
   console.log("Received MCP request:", req.body);
   try {
+    // Ensure server is fully initialized before handling any MCP traffic
+    await setupPromise;
     await transport.handleRequest(req, res, req.body);
   } catch (error) {
     console.error("Error handling MCP request:", error);
@@ -78,8 +80,11 @@ const setupServer = async () => {
   }
 };
 
+// Kick off server setup immediately and reuse this promise across handlers/startup
+const setupPromise = setupServer();
+
 // Start server
-setupServer()
+setupPromise
   .then(() => {
     app.listen(PORT, () => {
       console.log(`MCP Streamable HTTP Server listening on port ${PORT}`);
