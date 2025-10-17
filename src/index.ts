@@ -100,8 +100,9 @@ app.post("/mcp", async (req: Request, res: Response) => {
       // Reuse existing session
       console.log(`Reusing session: ${sessionId}`);
       transport = transports[sessionId];
-    } else if (initRequest) {
-      // Initialize a new session; adopt provided sessionId if present
+    } else {
+      // Create a new session and adopt provided sessionId if present.
+      // This supports clients that set a header before initialize.
       const newSessionId = sessionId ?? randomUUID();
       console.log(
         `Initializing new session (adopt header: ${sessionId ? "yes" : "no"}): ${newSessionId}`
@@ -128,17 +129,6 @@ app.post("/mcp", async (req: Request, res: Response) => {
 
       const { server } = createServer();
       await server.connect(transport);
-    } else {
-      console.error("Invalid session or request");
-      res.status(400).json({
-        jsonrpc: "2.0",
-        error: {
-          code: -32000,
-          message: "Bad Request: Invalid session",
-        },
-        id: null,
-      });
-      return;
     }
 
     await transport.handleRequest(req, res, req.body);
