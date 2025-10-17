@@ -5,8 +5,8 @@
  * with OpenAI for tool-augmented text generation.
  */
 import 'dotenv/config';
-import { experimental_createMCPClient as createMCPClient, generateText } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
+import { experimental_createMCPClient as createMCPClient, generateText, stepCountIs } from 'ai';
+import { openai } from '@ai-sdk/openai';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 async function main() {
@@ -22,34 +22,43 @@ async function main() {
   try {
     // Discover available tools from MCP server
     const tools = await mcpClient.tools();
+    // Note: tools handle is passed directly to generateText; not enumerable with Object.keys
 
-    const toolNames = Object.keys(tools || {});
-    console.log('Discovered MCP tools:');
-
-    if (!toolNames.length) {
-      console.log('No tools discovered. Ensure the MCP server is running.');
-      return;
+    // Initialize OpenAI provider (uses OPENAI_API_KEY from env by default)
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('Missing OPENAI_API_KEY');
     }
 
-    console.log('Discovered MCP tools:');
-    toolNames.forEach(name => console.log(`- ${name}`));
+    // Configure user instruction (can be overridden via AGENT_PROMPT env var)
+    const userInstruction = process.env.AGENT_PROMPT ||
+      'Get active weather alerts for CA, then the forecast for 37.7749,-122.4194. After calling tools, produce a concise final summary. Do not end with a tool call.';
 
-    // Initialize OpenAI provider
-    const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-    // Configure prompt (can be overridden via AGENT_PROMPT env var)
-    const prompt = process.env.AGENT_PROMPT ||
-      'Get active weather alerts for CA, then the forecast for 37.7749,-122.4194.';
-
-    // Generate text with tool calling enabled
-    const { text } = await generateText({
-      model: openai('gpt-4o-mini'),
+    // Generate text with tool calling enabled (cookbook pattern uses messages)
+    const result = await generateText({
+      model: openai('gpt-4o'),
       tools,
-      prompt,
+      messages: [
+        { role: 'system', content: 'You can call MCP tools. Always provide a final concise summary.' },
+        { role: 'user', content: userInstruction },
+      ],
+      toolChoice: 'auto',
+      maxToolRoundtrips: 1,
+      temperature: 0.2,
+      stopWhen: stepCountIs(2),
     });
 
-    console.log(`Prompt: ${prompt}\n`);
-    console.log(`Response: ${text}`);
+    console.log(`Prompt: ${userInstruction}\n`);
+    console.log(`Response: ${result.text || '(empty text)'}\n`);
+    
+    if (result.toolResults && result.toolResults.length) {
+      console.log('--- Tool call trace ---');
+      for (const tr of result.toolResults) {
+        console.log(`[${tr.toolName}] state=${tr.state}`);
+        if (tr.result) console.log(tr.result);
+        if (tr.error) console.error(tr.error);
+      }
+      console.log('-----------------------');
+    }
   } finally {
     await mcpClient.close();
   }
