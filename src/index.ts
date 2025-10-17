@@ -93,16 +93,19 @@ app.post("/mcp", async (req: Request, res: Response) => {
   console.log("Received MCP POST request:", req.body);
   const sessionId = req.headers["mcp-session-id"] as string | undefined;
   let transport: StreamableHTTPServerTransport;
+  const initRequest = isInitializeRequest(req.body);
 
   try {
     if (sessionId && transports[sessionId]) {
       // Reuse existing session
       console.log(`Reusing session: ${sessionId}`);
       transport = transports[sessionId];
-    } else if (!sessionId) {
-      // New session initialization (no session header provided)
-      console.log("Initializing new session");
-      const newSessionId = randomUUID();
+    } else if (initRequest) {
+      // Initialize a new session; adopt provided sessionId if present
+      const newSessionId = sessionId ?? randomUUID();
+      console.log(
+        `Initializing new session (adopt header: ${sessionId ? "yes" : "no"}): ${newSessionId}`
+      );
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => newSessionId,
       });
