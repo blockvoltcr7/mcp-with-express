@@ -160,8 +160,10 @@ app.post("/mcp", async (req: Request, res: Response) => {
  */
 app.get("/mcp", async (req: Request, res: Response) => {
   console.log("Received MCP GET request");
-  const sessionId = req.headers["mcp-session-id"] as string;
-  const transport = transports[sessionId];
+  const sessionIdHeader = req.headers["mcp-session-id"] as string | undefined;
+  const sessionIdQuery = (req.query["mcp-session-id"] as string | undefined) || (req.query["mcp_session_id"] as string | undefined);
+  const sessionId = sessionIdHeader ?? sessionIdQuery;
+  const transport = sessionId ? transports[sessionId] : undefined;
 
   if (transport) {
     try {
@@ -189,8 +191,10 @@ app.get("/mcp", async (req: Request, res: Response) => {
  */
 app.delete("/mcp", async (req: Request, res: Response) => {
   console.log("Received MCP DELETE request");
-  const sessionId = req.headers["mcp-session-id"] as string;
-  const transport = transports[sessionId];
+  const sessionIdHeader = req.headers["mcp-session-id"] as string | undefined;
+  const sessionIdQuery = (req.query["mcp-session-id"] as string | undefined) || (req.query["mcp_session_id"] as string | undefined);
+  const sessionId = sessionIdHeader ?? sessionIdQuery;
+  const transport = sessionId ? transports[sessionId] : undefined;
 
   if (transport) {
     try {
