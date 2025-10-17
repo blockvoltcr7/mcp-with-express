@@ -1,14 +1,16 @@
 import 'dotenv/config';
 import { Agent, run, MCPServerStreamableHttp } from '@openai/agents';
 
+/**
+ * Multi-Agent Runner Script
+ *
+ * Demonstrates running two OpenAI Agents concurrently, each with their own
+ * MCP server connection. Shows how to handle parallel MCP sessions.
+ */
 async function main() {
   const url = process.env.MCP_URL || 'http://localhost:3000/mcp';
 
-  // Optional prompt overrides via env
-  const promptA = process.env.AGENT_A_PROMPT || 'List the available MCP tools and their input parameters.';
-  const promptB = process.env.AGENT_B_PROMPT || 'What is the forecast for 37.7749, -122.4194?';
-
-  // Create two independent MCP HTTP sessions (server will assign session IDs)
+  // Create two independent MCP server sessions
   const mcpA = new MCPServerStreamableHttp({
     url,
     name: 'Weather MCP Server (A)',
@@ -18,11 +20,16 @@ async function main() {
     name: 'Weather MCP Server (B)',
   });
 
+  const agentAPrompt = 'List the available MCP tools and their input parameters.';
+
+  // Create agents with different instructions
   const agentA = new Agent({
     name: 'Agent A',
     instructions: 'You can use the MCP tools to list capabilities and describe their inputs.',
     mcpServers: [mcpA],
   });
+
+  const agentBPrompt = 'What is the forecast for 37.7749, -122.4194?';
 
   const agentB = new Agent({
     name: 'Agent B',
@@ -30,19 +37,25 @@ async function main() {
     mcpServers: [mcpB],
   });
 
-  // Connect both sessions
+  // Connect both MCP servers concurrently
   await Promise.all([mcpA.connect(), mcpB.connect()]);
 
   try {
-    // Run both agents concurrently
+    // Run both agents concurrently and collect results
     const [resA, resB] = await Promise.all([
-      run(agentA, promptA),
-      run(agentB, promptB),
+      run(agentA, agentAPrompt),
+      run(agentB, agentBPrompt),
     ]);
 
-    console.log('[Agent A]\n' + resA.finalOutput + '\n');
-    console.log('[Agent B]\n' + resB.finalOutput + '\n');
+    console.log('[Agent A]');
+    console.log(`Prompt: ${agentAPrompt}`);
+    console.log(`Response: ${resA.finalOutput}\n`);
+
+    console.log('[Agent B]');
+    console.log(`Prompt: ${agentBPrompt}`);
+    console.log(`Response: ${resB.finalOutput}\n`);
   } finally {
+    // Clean up both connections
     await Promise.all([mcpA.close(), mcpB.close()]);
   }
 }
