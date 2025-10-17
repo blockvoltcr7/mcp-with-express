@@ -591,8 +591,8 @@ POST /mcp HTTP/1.1
 
 <span class="keyword">const</span> mcpServer = <span class="keyword">new</span> MCPServerStreamableHttp({
   url: <span class="string">'http://localhost:3000/mcp'</span>,
-  name: <span class="string">'Weather MCP Server'</span>,
-  sessionId: <span class="string">`session-${Date.now()}`</span>
+  name: <span class="string">'Weather MCP Server'</span>
+  <span class="comment">// sessionId is assigned by server during connect()</span>
 });
 
 <span class="keyword">await</span> mcpServer.connect();
@@ -724,13 +724,16 @@ pnpm dev
             <h3>Test with Agent Scripts</h3>
             <div class="code-block">
 <span class="comment"># Single agent demo</span>
-pnpm agent
+pnpm agent:local
 
 <span class="comment"># Multi-agent demo (parallel execution)</span>
-pnpm agents:multi
+pnpm agents:multi:local
 
 <span class="comment"># Vercel AI SDK demo</span>
-pnpm vercel:agent
+pnpm vercel:agent:local
+
+<span class="comment"># Run all three agents sequentially</span>
+pnpm agents:all:local
             </div>
 
             <div class="alert alert-success">

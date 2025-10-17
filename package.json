@@ -19,7 +19,10 @@
     "agents:multi:prod": "MCP_URL=https://mcp-with-express-jet.vercel.app/mcp node scripts/multi-agent.mjs",
     "vercel:agent": "node scripts/vercel-ai-agent.mjs",
     "vercel:agent:local": "MCP_URL=http://localhost:3000/mcp node scripts/vercel-ai-agent.mjs",
-    "vercel:agent:prod": "MCP_URL=https://mcp-with-express-jet.vercel.app/mcp node scripts/vercel-ai-agent.mjs"
+    "vercel:agent:prod": "MCP_URL=https://mcp-with-express-jet.vercel.app/mcp node scripts/vercel-ai-agent.mjs",
+    "agents:all": "node scripts/run-all-agents.mjs",
+    "agents:all:local": "MCP_URL=http://localhost:3000/mcp node scripts/run-all-agents.mjs",
+    "agents:all:prod": "MCP_URL=https://mcp-with-express-jet.vercel.app/mcp node scripts/run-all-agents.mjs"
   },
   "files": [
     "build"
@@ -28,6 +31,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.52",
     "@modelcontextprotocol/sdk": "^1.10.0",
     "@openai/agents": "^0.1.9",
     "add": "^2.0.6",
